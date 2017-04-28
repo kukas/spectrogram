@@ -75,6 +75,10 @@ public:
 		return readFrames;
 	}
 
+	int seek(int frames){
+
+	}
+
 	void setChannel(int channel_){
 		if(channel_ >= 0 && channel_ < channels)
 			channel = channel_;
@@ -85,17 +89,16 @@ public:
 
 class SlidingWindow
 {
-	int bufferPosition = 0;
+	int position = 0;
 	int bufferSize;
 
-	int windowPosition = 0;
 	int windowSize;
 	int windowSlide;
 
 	vector<double> buffer;
+	vector<double> window;
 	ChannelReader& reader;
 public:
-	vector<double> window;
 	SlidingWindow(ChannelReader reader) : reader(reader) {
 		setWindow(1024, 64);
 	}
@@ -104,22 +107,29 @@ public:
 		windowSize = size;
 		windowSlide = slide;
 
-		if(slide < size){
+		if(slide <= size){
 			bufferSize = slide;
 		}
 		else {
-			bufferSize = size;
+			bufferSize = slide - size;
 		}
 
 		buffer.resize(bufferSize);
 		window.resize(windowSize);
 	}
 
-	bool readWindow(){
-		int readBytes = reader.read(window, windowSize);
-		bufferPosition += readBytes;
-		windowPosition += readBytes;
+	bool readTo(vector<double>& buf){
+		int readBytes = reader.read(buf, windowSize);
+		position += readBytes;
 		return readBytes == windowSize;
+	}
+
+	bool readWindow(){
+		return readTo(window);
+	}
+
+	bool readBuffer(){
+		return readTo(buffer);
 	}
 
 	vector<double>& getWindow(){
@@ -127,12 +137,23 @@ public:
 	}
 
 	bool next(){
-		if(windowPosition == 0){
+		if(position == 0){
 			return readWindow();
 		}
+
+		if(windowSlide < windowSize){
+			// slide existing data
+			copy(window.begin()+windowSlide, window.end(), window.begin());
+			// read and copy new data to the end
+			bool notEnd = readBuffer();
+			copy(buffer.begin(), buffer.end(), window.end()-windowSlide);
+			return notEnd;
+		}
 		else {
-			// int readBytes = reader.read(buffer, bufferSize);
-			return false;
+			// posun
+			readBuffer();
+			// čtení
+			return readWindow();
 		}
 	}
 
@@ -165,14 +186,25 @@ read_file (const char * fname)
 
 	// sw.readWindow();
 	vector<double> buffer;
-	buffer.resize(128);
-	sw.setWindow(128, 16);
-	sw.read(buffer, 128);
+	int bufsiz = 8;
+	buffer.resize(bufsiz);
+	sw.setWindow(bufsiz, 4);
+	sw.read(buffer, bufsiz);
 
 	for (vector<double>::iterator i = buffer.begin(); i != buffer.end(); ++i)
 	{
 		cout << *i << endl;
 	}
+
+	cout << endl<< endl;
+
+	sw.read(buffer, bufsiz);
+
+	for (vector<double>::iterator i = buffer.begin(); i != buffer.end(); ++i)
+	{
+		cout << *i << endl;
+	}
+
 
 	// int channels = file.channels();
 	// int frames = file.frames();
