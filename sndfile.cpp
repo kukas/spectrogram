@@ -98,25 +98,6 @@ class SlidingWindow
 	vector<double> buffer;
 	vector<double> window;
 	ChannelReader& reader;
-public:
-	SlidingWindow(ChannelReader reader) : reader(reader) {
-		setWindow(1024, 64);
-	}
-
-	void setWindow(int size, int slide){
-		windowSize = size;
-		windowSlide = slide;
-
-		if(slide <= size){
-			bufferSize = slide;
-		}
-		else {
-			bufferSize = slide - size;
-		}
-
-		buffer.resize(bufferSize);
-		window.resize(windowSize);
-	}
 
 	bool readTo(vector<double>& buf){
 		int readBytes = reader.read(buf, windowSize);
@@ -131,11 +112,6 @@ public:
 	bool readBuffer(){
 		return readTo(buffer);
 	}
-
-	vector<double>& getWindow(){
-		return window;
-	}
-
 	bool next(){
 		if(position == 0){
 			return readWindow();
@@ -155,6 +131,26 @@ public:
 			// čtení
 			return readWindow();
 		}
+	}
+
+public:
+	SlidingWindow(ChannelReader reader) : reader(reader) {
+		setWindow(128, 64);
+	}
+
+	void setWindow(int size, int slide){
+		windowSize = size;
+		windowSlide = slide;
+
+		if(slide <= size){
+			bufferSize = slide;
+		}
+		else {
+			bufferSize = slide - size;
+		}
+
+		buffer.resize(bufferSize);
+		window.resize(windowSize);
 	}
 
 	bool read(vector<double>& outBuffer, int size){
