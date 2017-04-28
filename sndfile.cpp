@@ -11,9 +11,12 @@
 #include <sndfile.hh>
 #include "png++/png.hpp"
 #include <memory>
+#include <algorithm>
+#include <numeric>
 
 
-#define BUFFER_LEN 2048
+
+#define BUFFER_LEN 1024
 
 using namespace std;
 using namespace png;
@@ -160,6 +163,41 @@ public:
 	}
 };
 
+
+class ImageUtils
+{
+public:
+	static void hline(image<rgb_pixel>& img, int x, int y, int size){
+		rgb_pixel p(255, 255, 255);
+		for (int i = y; i < y+size; ++i)
+		{
+			img.set_pixel(x, i, p);
+		}
+	}
+
+	static void vline(image<rgb_pixel>& img, int x, int y, int size){
+		rgb_pixel p(255, 255, 255);
+		for (int i = x; i < x+size; ++i)
+		{
+			img.set_pixel(i, y, p);
+		}
+	}
+
+	static void rectangle(image<rgb_pixel>& img, int x, int y, int width, int height){
+		rgb_pixel p(255, 255, 255);
+		for (int x_ = x; x_ < x+width; ++x_)
+		{
+			img.set_pixel(x_,y, p);
+			img.set_pixel(x_,y+height-1, p);
+		}
+		for (int y_ = y; y_ < y+height; ++y_)
+		{
+			img.set_pixel(x,y_, p);
+			img.set_pixel(x+width-1,y_, p);
+		}
+	}
+};
+
 class ImageBlock
 {
 protected:
@@ -177,33 +215,147 @@ public:
 	};
 };
 
-class Rectangle : public ImageBlock
-{
+class AveragesRenderer : public ImageBlock {
+	vector<double> spectrumSums;
+	int width = 100;
 public:
-	Rectangle(int x_, int y_, int width_, int height_){
-		width = width_+1;
-		height = height_+1;
-		x = x_;
-		y = y_;
+	void addFrame(vector<double>& column){
+		if(spectrumSums.size() == 0){
+			spectrumSums = column;
+		}
+		else {
+			for (int i = 0; i < spectrumSums.size(); ++i)
+			{
+				spectrumSums[i] += column[i];
+			}
+		}
 	}
+
 	virtual void render(image<rgb_pixel>& img, int tx, int ty){
-		cout << "rendering";
-		rgb_pixel p(255, 255, 255);
-		for (int x_ = tx+x; x_ < tx+x+width; ++x_)
+		tx += x;
+		ty += y;
+		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
+
+		double maxValue = *max_element(spectrumSums.begin(), spectrumSums.end());
+
+		// empty spectrum
+		if(maxValue == 0)
+			return;
+
+		for (int i = 0; i < spectrumSums.size(); ++i)
 		{
-			img.set_pixel(x_,ty+y, p);
-			img.set_pixel(x_,ty+y+height-1, p);
+			int value = spectrumSums[i]/maxValue*width;
+			ImageUtils::vline(img, tx, ty+i, value);
 		}
-		for (int y_ = ty+y; y_ < ty+y+height; ++y_)
-		{
-			img.set_pixel(tx+x,y_, p);
-			img.set_pixel(tx+x+width-1,y_, p);
-		}
+	}
+
+	virtual int getWidth(){
+		return width;
+	};
+	virtual int getHeight(){
+		return spectrumSums.size();
 	};
 };
 
 class FFTRenderer : public ImageBlock {
+	vector<vector<double>> spectrum;
 
+	// http://stackoverflow.com/questions/15868234/map-a-value-0-0-1-0-to-color-gain
+	double linear(double x, double start, double width = 0.2) {
+		if (x < start)
+			return 0;
+		else if (x > start+width)
+			return 1;
+		else
+			return (x-start) / width;
+	}
+
+	double getR(double value){
+		return linear(value, 0.2);
+	}
+	double getG(double value){
+		return linear(value, 0.6);
+	}
+	double getB(double value){
+		return linear(value, 0) - linear(value, 0.4) + linear(value, 0.8);
+	}
+public:
+	void addFrame(vector<double>& column){
+		spectrum.push_back(column);
+	}
+
+	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		tx += x;
+		ty += y;
+		// find maxValue;
+		double maxValue = 0;
+		for (int x_ = 0; x_ < spectrum.size(); ++x_)
+		{
+			for (int y_ = 0; y_ < spectrum[y_].size(); ++y_)
+			{
+				maxValue = max(maxValue, spectrum[x_][y_]);
+			}
+		}
+
+		// empty spectrum
+		if(maxValue == 0)
+			return;
+
+		int bufferSize = getHeight();
+
+		for (int x_ = 0; x_ < spectrum.size(); ++x_)
+		{
+			for (int y_ = 0; y_ < spectrum[x_].size(); ++y_)
+			{
+				// int yy = round(bufferSize*log(y)/log(bufferSize));
+				double value = spectrum[x_][y_]/maxValue;
+				value = 1-min(-log(value), 12.0)/12.0;
+				value *= 255;
+				img.set_pixel(tx+x_, ty+y_, rgb_pixel(value, value, value));
+			}
+		}
+
+		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
+	}
+
+	virtual int getWidth(){
+		return spectrum.size();
+	};
+	virtual int getHeight(){
+		if(spectrum.size() == 0)
+			return 0;
+		return spectrum[0].size();
+	};
+};
+
+class WaveRenderer : public ImageBlock {
+	vector<double> wave;
+	int height = 100;
+public:
+	void addFrame(vector<double>& column, int slide){
+		// double maxValue = accumulate(column.begin(), column.end(), 0)/((double)column.size());
+		double maxValue = *max_element(column.begin(), column.begin()+slide);
+		wave.push_back(maxValue);
+	}
+
+	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		tx += x;
+		ty += y;
+		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
+		double halfheight = 0.5*height;
+		for (int i = 0; i < wave.size(); ++i)
+		{
+			int size = halfheight*wave[i];
+			ImageUtils::hline(img, tx+x+i, ty+halfheight-size, size*2);
+		}
+	}
+
+	virtual int getWidth(){
+		return wave.size();
+	};
+	virtual int getHeight(){
+		return height;
+	};
 };
 
 class ImageOutput
@@ -234,6 +386,8 @@ public:
 
 		image<rgb_pixel> img(maxx, maxy);
 
+		cout << endl << maxx << "x" << maxy << endl;
+
 		render(img, margin, margin);
 
 		img.write(outputFilename);
@@ -248,6 +402,7 @@ read_file (const char * fname)
 
 	file = SndfileHandle(fname);
 	ChannelReader cr(file);
+	// cr.setChannel(1);
 	SlidingWindow sw(cr);
 
 	printf ("Opened file '%s'\n", fname) ;
@@ -262,40 +417,46 @@ read_file (const char * fname)
 	int slide = 128;
 	sw.setWindow(BUFFER_LEN, slide);
 
-	ImageOutput imageOut;
-	// ImageBlock* rr = new Rectangle(0, 0, 100, 100);
-	imageOut.addBlock(make_unique<Rectangle>(10, 20, 100, 100));
-
-	imageOut.renderImage("out.png");
-
-
 	// int height = BUFFER_LEN;
 	// int width = ceil(file.frames()/slide);
 		
-	// Complex fourierBuffer2[BUFFER_LEN];
+	Complex fourierBuffer2[BUFFER_LEN];
+
+	unique_ptr<FFTRenderer> fftrender = make_unique<FFTRenderer>();
+	unique_ptr<WaveRenderer> waverender = make_unique<WaveRenderer>();
+	unique_ptr<AveragesRenderer> averagesrender = make_unique<AveragesRenderer>();
 
 	// int x = 0;
-	// while(sw.read(buffer, BUFFER_LEN)){
-	// 	for (int i = 0; i < BUFFER_LEN; i++){
-	// 		fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
-	// 		// fourierBuffer2[i] = buffer[i];
-	// 	}
+	while(sw.read(buffer, BUFFER_LEN)){
+		for (int i = 0; i < BUFFER_LEN; i++){
+			fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
+			// fourierBuffer2[i] = buffer[i];
+		}
+
+		waverender->addFrame(buffer, slide);
 		
- //    	CArray data(fourierBuffer2, BUFFER_LEN);
-	//     fft(data);
+    	CArray data(fourierBuffer2, BUFFER_LEN);
+	    fft(data);
 
-	// 	int y = 0;
-	// 	for (int i = BUFFER_LEN/2; i < BUFFER_LEN; i++){
-	// 		Complex c = data[min(BUFFER_LEN, i)];
-	// 		double val3 = log(abs(c))/log(100);
-	// 		val3 = min(1.0, max(0.0, val3))*255;
-	// 		img.set_pixel(x,y, rgb_pixel(val3, val3, val3));
-	// 		y++;
-	// 	}
+	    vector<double> values(BUFFER_LEN/2);
+		for (int i = 0; i < BUFFER_LEN/2; i++){
+			Complex c = data[BUFFER_LEN/2+i];
+			values[i] = abs(c);
+		}
 
-	// 	x++;
-	// }
+		fftrender->addFrame(values);
+		averagesrender->addFrame(values);
+	}
 
+	ImageOutput imageOut;
+	waverender->y = fftrender->getHeight()+10;
+	averagesrender->x = fftrender->getWidth()+10;
+
+	imageOut.addBlock(move(fftrender));
+	imageOut.addBlock(move(waverender));
+	imageOut.addBlock(move(averagesrender));
+
+	imageOut.renderImage("out.png");
 
 	// int readBytes = file.read (buffer, BUFFER_LEN);
 	// int x = 0;
