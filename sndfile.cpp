@@ -10,6 +10,8 @@
 #include <cmath>
 #include <sndfile.hh>
 #include "png++/png.hpp"
+#include <memory>
+
 
 #define BUFFER_LEN 2048
 
@@ -158,6 +160,86 @@ public:
 	}
 };
 
+class ImageBlock
+{
+protected:
+	int width;
+	int height;
+public:
+	int x;
+	int y;
+	virtual void render(image<rgb_pixel>& img, int tx, int ty) = 0;
+	virtual int getWidth(){
+		return width;
+	};
+	virtual int getHeight(){
+		return height;
+	};
+};
+
+class Rectangle : public ImageBlock
+{
+public:
+	Rectangle(int x_, int y_, int width_, int height_){
+		width = width_+1;
+		height = height_+1;
+		x = x_;
+		y = y_;
+	}
+	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		cout << "rendering";
+		rgb_pixel p(255, 255, 255);
+		for (int x_ = tx+x; x_ < tx+x+width; ++x_)
+		{
+			img.set_pixel(x_,ty+y, p);
+			img.set_pixel(x_,ty+y+height-1, p);
+		}
+		for (int y_ = ty+y; y_ < ty+y+height; ++y_)
+		{
+			img.set_pixel(tx+x,y_, p);
+			img.set_pixel(tx+x+width-1,y_, p);
+		}
+	};
+};
+
+class FFTRenderer : public ImageBlock {
+
+};
+
+class ImageOutput
+{
+	vector<unique_ptr<ImageBlock>> blocks;
+	int margin = 10;
+public:
+	void addBlock(unique_ptr<ImageBlock> block){
+		blocks.push_back(move(block));
+	}
+
+	void render(image<rgb_pixel>& img, int tx, int ty){
+		for(size_t i = 0; i < blocks.size(); ++i){
+			blocks[i]->render(img, tx, ty);
+		}
+	}
+
+	void renderImage(string outputFilename){
+		int maxx = 1;
+		int maxy = 1;
+		for(size_t i = 0; i < blocks.size(); ++i){
+			maxx = max(blocks[i]->x+blocks[i]->getWidth(), maxx);
+			maxy = max(blocks[i]->y+blocks[i]->getHeight(), maxy);
+		}
+
+		maxx += margin*2;
+		maxy += margin*2;
+
+		image<rgb_pixel> img(maxx, maxy);
+
+		render(img, margin, margin);
+
+		img.write(outputFilename);
+	}
+};
+
 static void
 read_file (const char * fname)
 {
@@ -179,42 +261,40 @@ read_file (const char * fname)
 	
 	int slide = 128;
 	sw.setWindow(BUFFER_LEN, slide);
-	// sw.read(buffer, BUFFER_LEN);
 
-	// int channels = file.channels();
-	// int frames = file.frames();
-	// int halfheight = 300;
-	// int scale = 32768/halfheight;
+	ImageOutput imageOut;
+	// ImageBlock* rr = new Rectangle(0, 0, 100, 100);
+	imageOut.addBlock(make_unique<Rectangle>(10, 20, 100, 100));
 
-	int height = BUFFER_LEN;
-	int width = ceil(file.frames()/slide);
+	imageOut.renderImage("out.png");
+
+
+	// int height = BUFFER_LEN;
+	// int width = ceil(file.frames()/slide);
 		
-	image<rgb_pixel> img(width, height);
+	// Complex fourierBuffer2[BUFFER_LEN];
 
-	Complex fourierBuffer2[BUFFER_LEN];
-
-	int x = 0;
-	while(sw.read(buffer, BUFFER_LEN)){
-		for (int i = 0; i < BUFFER_LEN; i++){
-			fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
-			// fourierBuffer2[i] = buffer[i];
-		}
+	// int x = 0;
+	// while(sw.read(buffer, BUFFER_LEN)){
+	// 	for (int i = 0; i < BUFFER_LEN; i++){
+	// 		fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
+	// 		// fourierBuffer2[i] = buffer[i];
+	// 	}
 		
-    	CArray data(fourierBuffer2, BUFFER_LEN);
-	    fft(data);
+ //    	CArray data(fourierBuffer2, BUFFER_LEN);
+	//     fft(data);
 
-		int y = 0;
-		for (int i = BUFFER_LEN/2; i < BUFFER_LEN; i++){
-			Complex c = data[min(BUFFER_LEN, i)];
-			double val3 = log(abs(c))/log(100);
-			val3 = min(1.0, max(0.0, val3))*255;
-			img.set_pixel(x,y, rgb_pixel(val3, val3, val3));
-			y++;
-		}
+	// 	int y = 0;
+	// 	for (int i = BUFFER_LEN/2; i < BUFFER_LEN; i++){
+	// 		Complex c = data[min(BUFFER_LEN, i)];
+	// 		double val3 = log(abs(c))/log(100);
+	// 		val3 = min(1.0, max(0.0, val3))*255;
+	// 		img.set_pixel(x,y, rgb_pixel(val3, val3, val3));
+	// 		y++;
+	// 	}
 
-		x++;
-	}
-	img.write("output.png");
+	// 	x++;
+	// }
 
 
 	// int readBytes = file.read (buffer, BUFFER_LEN);
