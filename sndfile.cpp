@@ -11,12 +11,10 @@
 #include <sndfile.hh>
 #include "png++/png.hpp"
 
-#define BUFFER_LEN 512
+#define BUFFER_LEN 2048
 
 using namespace std;
 using namespace png;
-
-
 
 #include <complex>
 #include <iostream>
@@ -75,10 +73,6 @@ public:
 		return readFrames;
 	}
 
-	int seek(int frames){
-
-	}
-
 	void setChannel(int channel_){
 		if(channel_ >= 0 && channel_ < channels)
 			channel = channel_;
@@ -99,18 +93,18 @@ class SlidingWindow
 	vector<double> window;
 	ChannelReader& reader;
 
-	bool readTo(vector<double>& buf){
-		int readBytes = reader.read(buf, windowSize);
+	bool readTo(vector<double>& buf, int size){
+		int readBytes = reader.read(buf, size);
 		position += readBytes;
-		return readBytes == windowSize;
+		return readBytes == size;
 	}
 
 	bool readWindow(){
-		return readTo(window);
+		return readTo(window, windowSize);
 	}
 
 	bool readBuffer(){
-		return readTo(buffer);
+		return readTo(buffer, bufferSize);
 	}
 	bool next(){
 		if(position == 0){
@@ -171,7 +165,6 @@ read_file (const char * fname)
 	SndfileHandle file;
 
 	file = SndfileHandle(fname);
-
 	ChannelReader cr(file);
 	SlidingWindow sw(cr);
 
@@ -182,53 +175,29 @@ read_file (const char * fname)
 
 	// sw.readWindow();
 	vector<double> buffer;
-	int bufsiz = 8;
-	buffer.resize(bufsiz);
-	sw.setWindow(bufsiz, 4);
-	sw.read(buffer, bufsiz);
-
-	for (vector<double>::iterator i = buffer.begin(); i != buffer.end(); ++i)
-	{
-		cout << *i << endl;
-	}
-
-	cout << endl<< endl;
-
-	sw.read(buffer, bufsiz);
-
-	for (vector<double>::iterator i = buffer.begin(); i != buffer.end(); ++i)
-	{
-		cout << *i << endl;
-	}
-
+	buffer.resize(BUFFER_LEN);
+	
+	int slide = 128;
+	sw.setWindow(BUFFER_LEN, slide);
+	// sw.read(buffer, BUFFER_LEN);
 
 	// int channels = file.channels();
 	// int frames = file.frames();
 	// int halfheight = 300;
 	// int scale = 32768/halfheight;
 
-	// int height = BUFFER_LEN;
-	// int width = ceil(file.frames()/BUFFER_LEN);
+	int height = BUFFER_LEN;
+	int width = ceil(file.frames()/slide);
 		
-	// int bufferlenchannels = BUFFER_LEN*channels;
-	// double buffer[bufferlenchannels];
+	image<rgb_pixel> img(width, height);
 
-	// sw.read(buffer);
-	// for (int i = 0; i < bufferlenchannels; ++i)
-	// {
-	// 	// cout << buffer[i] << endl;
-	// }
-
-	// image<rgb_pixel> img(width, height);
-
-	// Complex fourierBuffer2[BUFFER_LEN];
-
-/*
+	Complex fourierBuffer2[BUFFER_LEN];
 
 	int x = 0;
-	while(sw.read(buffer, bufferlenchannels) == bufferlenchannels){
+	while(sw.read(buffer, BUFFER_LEN)){
 		for (int i = 0; i < BUFFER_LEN; i++){
-			fourierBuffer2[i] = buffer[i*channels]/32768.0;
+			fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
+			// fourierBuffer2[i] = buffer[i];
 		}
 		
     	CArray data(fourierBuffer2, BUFFER_LEN);
@@ -236,30 +205,17 @@ read_file (const char * fname)
 
 		int y = 0;
 		for (int i = BUFFER_LEN/2; i < BUFFER_LEN; i++){
-			// double val = fourierBuffer2[i].real();
-			double val = log(data[min(BUFFER_LEN, i)].real())/log(100);
-			// double val = log(data[min(BUFFER_LEN, i)].real())/log(1000);
-			double val2 = log(data[min(BUFFER_LEN, i)].imag())/log(100);
-			// double val2 = log(data[min(BUFFER_LEN, i)].imag())/log(1000);
-			// cout << val << endl;
-			val = min(1.0, max(0.0, val))*255;
-			val2 = min(1.0, max(0.0, val2))*255;
-			// int y = halfheight+val*(halfheight-1);
-			// int y2 = halfheight+val2*(halfheight-1);
-			img.set_pixel(x,y, rgb_pixel(val, val2, 0));
-			// img.set_pixel(x,y, rgb_pixel(val, val2, 0));
-			// img.set_pixel(x,y2, rgb_pixel(255, 0, 0));
-
+			Complex c = data[min(BUFFER_LEN, i)];
+			double val3 = log(abs(c))/log(100);
+			val3 = min(1.0, max(0.0, val3))*255;
+			img.set_pixel(x,y, rgb_pixel(val3, val3, val3));
 			y++;
-			// cout << x << " " << y << endl;
 		}
 
 		x++;
 	}
-
 	img.write("output.png");
 
-*/
 
 	// int readBytes = file.read (buffer, BUFFER_LEN);
 	// int x = 0;
@@ -294,13 +250,11 @@ read_file (const char * fname)
 	// 	}
 	// 	x++;
 	// }
-
-	puts ("") ;
 }
 
 
 int main (void)
-{	const char * fname = "input/test2.wav" ;
+{	const char * fname = "input/test.wav" ;
 
 	puts ("\nSimple example showing usage of the C++ SndfileHandle object.\n") ;
 
