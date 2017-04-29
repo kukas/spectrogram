@@ -2,3 +2,6 @@ input/
 output/
 libs/
 sndfile
+*.o
+spectrogram
+*.png
