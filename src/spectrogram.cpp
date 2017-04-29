@@ -21,13 +21,13 @@ using namespace png;
 #include <valarray>
 
 #include "image_output.cpp"
+#include "fft.cpp"
 #include "window_functions.cpp"
 
 typedef std::complex<double> Complex;
 typedef std::valarray<Complex> CArray;
-// Cooley–Tukey FFT (in-place, divide-and-conquer)
-// Higher memory requirements and redundancy although more intuitive
-void fft(std::valarray<Complex>& x);
+
+// void fft(std::valarray<Complex>& x);
 
 
 class ChannelReader
@@ -228,6 +228,7 @@ private:
 
 int main(int argc, char** argv)
 {
+	// zpracování vstupních argumentů
 	if(argc == 1){
 		printhelp(argv[0]);
 		return 0;
@@ -249,9 +250,11 @@ int main(int argc, char** argv)
 
 	cout << "Vstupní soubor: " << options.input << endl;
 
+	// načtení souboru
 	SndfileHandle file;
 	file = SndfileHandle(options.input);
 
+	// kontrola, zda-li je soubor platný
 	if(file.samplerate() == 0 || file.channels() == 0 || file.frames() == 0){
 		cout << "chyba vstupního souboru"<<endl;
 		return 1;
@@ -261,6 +264,7 @@ int main(int argc, char** argv)
 	cout << "  Channels: " << file.channels() << endl;
 	cout << "  Frames: " << file.frames() << endl;
 
+	// nastavení čtení zvoleného kanálu
 	ChannelReader cr(file);
 	try {
 		cr.setChannel(options.channel);
@@ -269,9 +273,9 @@ int main(int argc, char** argv)
 		cout << "neplatný kanál"<<endl;
 		return 1;
 	}
-	SlidingWindow sw(cr);
-	unique_ptr<WindowFunction> windowf;
 
+	// nastavení window funkce
+	unique_ptr<WindowFunction> windowf;
 	if(options.windowFunction == "rect")
 		windowf = make_unique<RectangleWindowFunction>();
 	else if(options.windowFunction == "hann")
@@ -284,53 +288,69 @@ int main(int argc, char** argv)
 		cout << "neplatná window funkce"<<endl;
 		return 1;
 	}
+
+	// nastavení velikosti rámce
 	int windowSize = options.windowSize;
 	if((windowSize & (windowSize - 1)) != 0){
 		cout << "neplatná velikost rámce"<<endl;
 		return 1;
 	}
-
 	windowf->setWindowSize(windowSize);
-
-	vector<double> buffer;
-	buffer.resize(windowSize);
 	
+	// nastavení délky posouvání rámce
 	int slide = options.windowSlide;
 	if(slide <= 0){
 		cout << "neplatná délka posunutí rámce" << endl;
 		return 1;
 	}
+
+	// čtení souboru posuvným oknem
+	SlidingWindow sw(cr);
 	sw.setWindow(windowSize, slide);
 
-	Complex fourierBuffer2[windowSize];
-
+	// zobrazovací komponenty
 	unique_ptr<FFTRenderer> fftrender = make_unique<FFTRenderer>();
 	unique_ptr<WaveRenderer> waverender = make_unique<WaveRenderer>();
 	unique_ptr<AveragesRenderer> averagesrender = make_unique<AveragesRenderer>();
 
+	FFT myfft;
+
+	vector<double> buffer;
+	vector<double> fourierBuffer;
+	buffer.resize(windowSize);
+
+	fourierBuffer.resize(windowSize*2);
+
 	while(sw.read(buffer, windowSize)){
+		fill(fourierBuffer.begin()+windowSize, fourierBuffer.end(), 0);
+
 		for (int i = 0; i < windowSize; i++){
-			fourierBuffer2[i] = windowf->apply(buffer[i], i);
+			fourierBuffer[i] = windowf->apply(buffer[i], i);
+			// fourierBuffer2[i] = windowf->apply(buffer[i], i);
 			// fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
 			// fourierBuffer2[i] = buffer[i];
 		}
 
-		waverender->addFrame(buffer, slide);
 		
-    	CArray data(fourierBuffer2, windowSize);
-	    fft(data);
+    	// CArray data(fourierBuffer2, windowSize);
+	    myfft.transform(fourierBuffer);
+	    // fft(data);
 
-	    vector<double> values(windowSize/2);
-		for (int i = 0; i < windowSize/2; i++){
-			Complex c = data[windowSize/2+i];
-			values[i] = abs(c);
-		}
+	 //    vector<double> values(windowSize/2);
+		// for (int i = 0; i < windowSize/2; i++){
+		// 	Complex c = data[windowSize/2+i];
+		// 	values[i] = abs(c);
+		// }
 
-		fftrender->addFrame(values);
-		averagesrender->addFrame(values);
+		waverender->addFrame(buffer, slide);
+		averagesrender->addFrame(fourierBuffer);
+		fftrender->addFrame(fourierBuffer);
 	}
 
+	// obrázkový výstup
 	ImageOutput imageOut;
+
+	// umístění komponent
 	waverender->y = fftrender->getHeight()+10;
 	averagesrender->x = fftrender->getWidth()+10;
 
@@ -338,6 +358,7 @@ int main(int argc, char** argv)
 	imageOut.addBlock(move(waverender));
 	imageOut.addBlock(move(averagesrender));
 
+	// výstup
 	imageOut.renderImage("out.png");
 
 	return 0;

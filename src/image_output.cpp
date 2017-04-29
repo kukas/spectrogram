@@ -10,32 +10,32 @@ class ImageUtils
 {
 public:
 	static void hline(image<rgb_pixel>& img, int x, int y, int size){
-		rgb_pixel p(255, 255, 255);
+		rgb_pixel white(255, 255, 255);
 		for (int i = y; i < y+size; ++i)
 		{
-			img.set_pixel(x, i, p);
+			img[i][x] = white;
 		}
 	}
 
 	static void vline(image<rgb_pixel>& img, int x, int y, int size){
-		rgb_pixel p(255, 255, 255);
+		rgb_pixel white(255, 255, 255);
 		for (int i = x; i < x+size; ++i)
 		{
-			img.set_pixel(i, y, p);
+			img[y][i] = white;
 		}
 	}
 
 	static void rectangle(image<rgb_pixel>& img, int x, int y, int width, int height){
-		rgb_pixel p(255, 255, 255);
+		rgb_pixel white(255, 255, 255);
 		for (int x_ = x; x_ < x+width; ++x_)
 		{
-			img.set_pixel(x_,y, p);
-			img.set_pixel(x_,y+height-1, p);
+			img[y][x_] = white;
+			img[y+height-1][x_] = white;
 		}
 		for (int y_ = y; y_ < y+height; ++y_)
 		{
-			img.set_pixel(x,y_, p);
-			img.set_pixel(x+width-1,y_, p);
+			img[y_][x] = white;
+			img[y_][x+width-1] = white;
 		}
 	}
 };
@@ -46,8 +46,8 @@ protected:
 	int width;
 	int height;
 public:
-	int x;
-	int y;
+	int x = 0;
+	int y = 0;
 	virtual void render(image<rgb_pixel>& img, int tx, int ty) = 0;
 	virtual int getWidth(){
 		return width;
@@ -74,21 +74,23 @@ public:
 	}
 
 	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		if(spectrumSums.size() == 0)
+			return;
 		tx += x;
 		ty += y;
 		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
 
-		double maxValue = *max_element(spectrumSums.begin(), spectrumSums.end());
+		// double maxValue = *max_element(spectrumSums.begin(), spectrumSums.end());
 
-		// empty spectrum
-		if(maxValue == 0)
-			return;
+		// // empty spectrum
+		// if(maxValue == 0)
+		// 	return;
 
-		for (size_t i = 0; i < spectrumSums.size(); ++i)
-		{
-			int value = spectrumSums[i]/maxValue*width;
-			ImageUtils::vline(img, tx, ty+i, value);
-		}
+		// for (size_t i = 0; i < spectrumSums.size(); ++i)
+		// {
+		// 	int value = spectrumSums[i]/maxValue*width;
+		// 	ImageUtils::vline(img, tx, ty+i, value);
+		// }
 	}
 
 	virtual int getWidth(){
@@ -121,8 +123,18 @@ class FFTRenderer : public ImageBlock {
 	double getB(double value){
 		return linear(value, 0) - linear(value, 0.4) + linear(value, 0.8);
 	}
+
+	vector<rgb_pixel> palette;
 public:
-	void addFrame(vector<double>& column){
+	FFTRenderer(){
+		for (int i = 0; i < 256; ++i)
+		{
+			rgb_pixel p(i, 0, 0);
+			palette.push_back(p);
+		}
+		cout << palette.size();
+	}
+	void addFrame(vector<double> column){
 		spectrum.push_back(column);
 	}
 
@@ -151,9 +163,11 @@ public:
 			{
 				// int yy = round(bufferSize*log(y)/log(bufferSize));
 				double value = spectrum[x_][y_]/maxValue;
-				value = 1-min(-log(value), 12.0)/12.0;
+				// value = 1-min(-log(value), 12.0)/12.0;
 				value *= 255;
-				img.set_pixel(tx+x_, ty+y_, rgb_pixel(value, value, value));
+				// img[ty+y_][tx+x_] = palette[(size_t)value];
+				img[ty+y_][tx+x_] = rgb_pixel(value, value, value);
+				// img.set_pixel(tx+x_, ty+y_, rgb_pixel(value, value, value));
 			}
 		}
 
@@ -181,6 +195,8 @@ public:
 	}
 
 	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		if(wave.size() == 0)
+			return;
 		tx += x;
 		ty += y;
 		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());

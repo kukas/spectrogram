@@ -1,7 +1,9 @@
 #include <complex>
 #include <valarray>
 #include <cmath>
-
+#include <vector>
+using namespace std;
+/*
 typedef std::complex<double> Complex;
 typedef std::valarray<Complex> CArray;
 // Cooley–Tukey FFT (in-place, divide-and-conquer)
@@ -27,3 +29,12 @@ void fft(std::valarray<Complex>& x)
         x[k+N/2] = even[k] - t;
     }
 }
+*/
+
+class FFT
+{
+public:
+	void transform(vector<double>& data){
+		// return data;
+	}
+};
