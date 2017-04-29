@@ -175,13 +175,10 @@ public:
 		{
 			for (int y_ = 0; y_ < height; ++y_)
 			{
-				// int yy = round(bufferSize*log(y)/log(bufferSize));
 				double value = max(0.0, spectrum[x_][y_]/maxValue);
 				value = 1-min(-log(value), 12.0)/12.0;
 				value *= palette.size();
 				img[ty+height-y_][tx+x_] = palette[(size_t)value];
-				// img[ty+y_][tx+x_] = rgb_pixel(value, value, value);
-				// img.set_pixel(tx+x_, ty+y_, rgb_pixel(value, value, value));
 			}
 		}
 
@@ -218,7 +215,6 @@ class WaveRenderer : public ImageBlock {
 	int height = 100;
 public:
 	void addFrame(vector<double>& column, int slide){
-		// double maxValue = accumulate(column.begin(), column.end(), 0)/((double)column.size());
 		slide = min(slide, (int)column.size());
 		double maxValue = *max_element(column.begin(), column.begin()+slide);
 		wave.push_back(maxValue);
@@ -303,14 +299,6 @@ public:
 			double h = windowf->apply(height, x_*windowSize/width);
 			ImageUtils::vline(img, tx+x_, ty+height-h+1, h);
 		}
-
-		// if(rangey > 0){
-		// 	for (double y_ = 0; y_ <= rangey; y_ += dy)
-		// 	{
-		// 		ImageUtils::hline(img, tx-2 + width, ty + height-height*y_/rangey, 5);
-		// 		ImageUtils::hline(img, tx-2, ty + height-height*y_/rangey, 5);
-		// 	}
-		// }
 	}
 };
 

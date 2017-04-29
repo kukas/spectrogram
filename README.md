@@ -56,8 +56,16 @@ Program implementuje algoritmus zpracování signálu pomocí [short-time Fourie
 ### Podrobný popis
 Pro čtení vstupního souboru byla využita knihovna `libsndfile`, která zajišťuje kompatibilitu s nekomerčními zvukovými formáty. Vstup se čte sekvenčně, do paměti se vždy načte pouze potřebný počet samplů. Třída `ChannelReader` z výstupu knihovny `libsndfile` přečte jeden zvolený kanál. Třída `SlidingWindow` zajišťuje posouvání čtecího okénka, je také speciálně implementován případ pro posun větší než je velikost okénka, ten se hodí zejména u dlouhých vstupů.
 
-Na přečtená data se aplikuje _window funkce_ (zajíšťují potomci třídy `WindowFunction`). Pro zrychlení chodu programu je window funkce předpočítána.
+Na přečtená data se aplikuje _window funkce_ (zajíšťují potomci třídy `WindowFunction`). Pro zrychlení chodu programu je window funkce předpočítána. Vzorce pro implementované window funkce (`Hann`, `Hamming`, `Blackmann`) byly čerpány z [článku na wikipedii](https://en.wikipedia.org/wiki/Window_function#Spectral_analysis).
 
 Na upravená data se spustí algoritmus FFT (třída `FFT`), zde je také implementována optimalizace předpočítáním opakujících se hodnot. Pro implementaci použitého algoritmu jsem čerpal z [článku na wikipedii](https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm) a z veřejně dostupného kódu na [rosettacode.org](https://rosettacode.org/wiki/Fast_Fourier_transform#C.2B.2B).
 
 Výsledek FFT a vlnová funkce se předají do tříd zajišťujících grafický výstup (třídy v souboru `image_output.cpp`). Protože použitá knihovna `libpng` obstarává pouze převod 2d pole pixelů do png souboru, struktura vykreslování byla implementována od základů. Z toho důvodu také na obrázku není žádný text - usoudil jsem, že implementace renderování písma je nad rámec zápočtového programu. Třída `ImageOutput` při zavolání metody `renderImage` vypočítá konečné rozměry obrázku a vykreslí všechny `ImageBlock`. Potomci abstraktní třídy `ImageBlock` jsou jednotlivé komponenty, ze kterého je složený výsledný obrázek - tedy třída `FFTRenderer` (vykreslení spektrogramu [1]), `WaveRenderer` (vykreslení vlnového průběhu [2]), `AveragesRenderer` (vykreslení průměrných hodnot spektrogramu [3]), `WindowRenderer` (znázornění window funkce [4]), `ScaleRenderer` (vykreslení měřítka jednotlivých bloků).
+
+Barevné znázornění intenzity spektra je inspirováno paletou programu [SoX](http://sox.sourceforge.net/). Paleta byla aproximována z výstupu _SoXu_ pomocí lineárních kombinací RGB složek.
+
+# Credits
+* Zvuková nahrávka cella stažena z (freesound.org)[https://www.freesound.org/people/flcellogrl/packs/12408/]
+* Nahrávka amen breaku stažena z (freesound.org)[https://www.freesound.org/people/VEXST/sounds/24940/]
+* Nahrávka aphex.wav vyříznuta ze skladby ```Aphex Twin - ΔMi−1 = −αΣn=1NDi[n][Σj∈C[i]Fji[n − 1] + Fexti[n−1]]```
+* Ostatní nahrávky generovány programem (Audacity)[http://www.audacityteam.org/]

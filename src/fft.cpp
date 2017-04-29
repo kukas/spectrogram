@@ -26,10 +26,6 @@ public:
     }
     // https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
 	void transform(vector<double>& data){
-        // for (size_t i = 0; i < data.size(); i++)
-        //     cout << data[i] << " ";
-        // cout << endl;
-
         int N = data.size()/2;
         if(N == 1) return;
 
