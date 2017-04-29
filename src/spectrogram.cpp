@@ -24,12 +24,6 @@ using namespace png;
 #include "fft.cpp"
 #include "window_functions.cpp"
 
-typedef std::complex<double> Complex;
-typedef std::valarray<Complex> CArray;
-
-// void fft(std::valarray<Complex>& x);
-
-
 class ChannelReader
 {
 	int channels;
@@ -291,7 +285,7 @@ int main(int argc, char** argv)
 
 	// nastavení velikosti rámce
 	int windowSize = options.windowSize;
-	if((windowSize & (windowSize - 1)) != 0){
+	if((windowSize & (windowSize - 1)) != 0 || windowSize < 8){
 		cout << "neplatná velikost rámce"<<endl;
 		return 1;
 	}
@@ -313,7 +307,7 @@ int main(int argc, char** argv)
 	unique_ptr<WaveRenderer> waverender = make_unique<WaveRenderer>();
 	unique_ptr<AveragesRenderer> averagesrender = make_unique<AveragesRenderer>();
 
-	FFT myfft;
+	FFT fft;
 
 	vector<double> buffer;
 	vector<double> fourierBuffer;
@@ -326,25 +320,14 @@ int main(int argc, char** argv)
 
 		for (int i = 0; i < windowSize; i++){
 			fourierBuffer[i] = windowf->apply(buffer[i], i);
-			// fourierBuffer2[i] = windowf->apply(buffer[i], i);
 			// fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
-			// fourierBuffer2[i] = buffer[i];
 		}
 
-		
-    	// CArray data(fourierBuffer2, windowSize);
-	    myfft.transform(fourierBuffer);
-	    // fft(data);
-
-	 //    vector<double> values(windowSize/2);
-		// for (int i = 0; i < windowSize/2; i++){
-		// 	Complex c = data[windowSize/2+i];
-		// 	values[i] = abs(c);
-		// }
+		vector<double> mag = fft.getMagnitudes(fourierBuffer);
 
 		waverender->addFrame(buffer, slide);
-		averagesrender->addFrame(fourierBuffer);
-		fftrender->addFrame(fourierBuffer);
+		averagesrender->addFrame(mag);
+		fftrender->addFrame(mag);
 	}
 
 	// obrázkový výstup

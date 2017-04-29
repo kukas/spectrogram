@@ -129,10 +129,9 @@ public:
 	FFTRenderer(){
 		for (int i = 0; i < 256; ++i)
 		{
-			rgb_pixel p(i, 0, 0);
+			rgb_pixel p(i, i, i);
 			palette.push_back(p);
 		}
-		cout << palette.size();
 	}
 	void addFrame(vector<double> column){
 		spectrum.push_back(column);
@@ -141,12 +140,16 @@ public:
 	virtual void render(image<rgb_pixel>& img, int tx, int ty){
 		tx += x;
 		ty += y;
-		// find maxValue;
+		int width = getWidth();
+		int height = getHeight();
+
+		// find maxValue
 		double maxValue = 0;
-		for (size_t x_ = 0; x_ < spectrum.size(); ++x_)
+		for (int x_ = 0; x_ < width; ++x_)
 		{
-			for (size_t y_ = 0; y_ < spectrum[y_].size(); ++y_)
+			for (int y_ = 0; y_ < height; ++y_)
 			{
+
 				maxValue = max(maxValue, spectrum[x_][y_]);
 			}
 		}
@@ -155,18 +158,16 @@ public:
 		if(maxValue == 0)
 			return;
 
-		// int bufferSize = getHeight();
-
-		for (size_t x_ = 0; x_ < spectrum.size(); ++x_)
+		for (int x_ = 0; x_ < width; ++x_)
 		{
-			for (size_t y_ = 0; y_ < spectrum[x_].size(); ++y_)
+			for (int y_ = 0; y_ < height; ++y_)
 			{
 				// int yy = round(bufferSize*log(y)/log(bufferSize));
-				double value = spectrum[x_][y_]/maxValue;
-				// value = 1-min(-log(value), 12.0)/12.0;
+				double value = max(0.0, spectrum[x_][y_]/maxValue);
+				value = 1-min(-log(value), 12.0)/12.0;
 				value *= 255;
-				// img[ty+y_][tx+x_] = palette[(size_t)value];
-				img[ty+y_][tx+x_] = rgb_pixel(value, value, value);
+				img[ty+height-y_][tx+x_] = palette[(size_t)value];
+				// img[ty+y_][tx+x_] = rgb_pixel(value, value, value);
 				// img.set_pixel(tx+x_, ty+y_, rgb_pixel(value, value, value));
 			}
 		}
