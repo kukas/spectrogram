@@ -163,6 +163,23 @@ public:
 	}
 };
 
+class WindowFunction
+{
+protected:
+	int windowSize = 0;
+public:
+	virtual double apply(double value, int i) = 0;
+	virtual double setWindowSize(int windowsize){
+		windowSize = windowsize;
+	};
+};
+
+class RectangleWindowFunction : public WindowFunction
+{
+	virtual double apply(double value, int i) {
+		return value;
+	}
+};
 
 class ImageUtils
 {
@@ -394,53 +411,190 @@ public:
 	}
 };
 
-static void
-read_file (const char * fname)
+void printhelp(char* scriptName){
+	cout << "Použití: " << string(scriptName) << "[PŘEPÍNAČE] VSTUPNÍ_SOUBOR" << endl;
+	cout << "Generuje spektrogram ve formátu png ze VSTUPNÍHO SOUBORU." << endl;
+	cout << endl;
+	cout << "  -c KANÁL\t\t\tze VSTUPNÍHO SOUBORU čte KANÁL. Výchozí hodnota je 0 (1. kanál). Týká se pouze stereo nahrávek." << endl;
+	cout << "  -o VÝSTUPNÍ_SOUBOR\t\tspecifikuje název výstupní bitmapy. Výchozí název je output.png" << endl;
+	cout << "  -t VELIKOST\t\t\tnastaví velikost rámce pro FFT. Výchozí hodnota je 1024. VELIKOST musí být mocnina 2" << endl;
+	cout << "  -s DÉLKA\t\t\tnastaví délku posunutí rámce FFT. Výchozí hodnota je 128. Ovlivňuje výslednou šířku spektrogramu" << endl;
+	cout << "  -w WINDOW_FUNKCE\t\tpoužije vybranou window funkci" << endl;
+	cout << endl;
+	cout << "Seznam window funkcí:" << endl;
+	cout << "  rect\t\t Obdélníková window funkce" << endl;
+	cout << "  hann\t\t Hann window funkce" << endl;
+	cout << "  hamming\t Hamming window funkce" << endl;
+	cout << "  blackmann\t Blackman window funkce" << endl;
+}
+
+class Options
 {
+public:
+	string input = "";
+	string output = "output.png";
+	int channel = 0;
+	int windowSize = 1024;
+	int windowSlide = 128;
+	string windowFunction = "hann";
+	void process(char** argv) {
+		char* scriptName = argv[0];
+		while (*++argv && **argv == '-')
+		{
+			switch (argv[0][1]) {
+			case 'h':
+				printhelp(scriptName);
+				break;
+			case 'c':
+				if (*++argv)
+					channel = stoi(string(argv[0]));
+				else
+					error();
+				break;
+			case 't':
+				if (*++argv)
+					windowSize = stoi(string(argv[0]));
+				else
+					error();
+				break;
+			case 's':
+				if (*++argv)
+					windowSlide = stoi(string(argv[0]));
+				else
+					error();
+				break;
+			case 'w':
+				if (*++argv)
+					windowFunction = string(argv[0]);
+				else
+					error();
+				break;
+			case 'o':
+				if (*++argv)
+					output = string(argv[0]);
+				else
+					error();
+				break;
+			default:
+				error();
+			}
+		}
+
+		// vstup
+		if (argv[0]) {
+			input = string(argv[0]);
+		}
+
+		cout << input << endl;
+		cout << output << endl;
+		cout << channel << endl;
+		cout << windowSize << endl;
+		cout << windowSlide << endl;
+		cout << windowFunction << endl;
+	}
+private:
+	void error() const {
+		throw invalid_argument("invalid parameters");
+	}
+};
+
+int main(int argc, char** argv)
+{
+	if(argc == 1){
+		printhelp(argv[0]);
+		return 0;
+	}
+
+	Options options;
+	try {
+		options.process(argv);
+	}
+	catch (invalid_argument e) {
+		cout << "chyba v přepínačích"<<endl;
+		return 1;
+	}
+
+	if(options.input == ""){
+		cout << "chybějící vstupní soubor"<<endl;
+		return 1;
+	}
+
+	cout << "Vstupní soubor: " << options.input << endl;
 
 	SndfileHandle file;
+	file = SndfileHandle(options.input);
 
-	file = SndfileHandle(fname);
+	if(file.samplerate() == 0 || file.channels() == 0 || file.frames() == 0){
+		cout << "chyba vstupního souboru"<<endl;
+		return 1;
+	}
+
+	cout << "  Sample rate: " << file.samplerate() << endl;
+	cout << "  Channels: " << file.channels() << endl;
+	cout << "  Frames: " << file.frames() << endl;
+
 	ChannelReader cr(file);
-	// cr.setChannel(1);
+	try {
+		cr.setChannel(options.channel);
+	}
+	catch (invalid_argument e) {
+		cout << "neplatný kanál"<<endl;
+		return 1;
+	}
 	SlidingWindow sw(cr);
+	unique_ptr<WindowFunction> windowf;
 
-	printf ("Opened file '%s'\n", fname) ;
-	printf ("    Sample rate : %d\n", file.samplerate ()) ;
-	printf ("    Channels    : %d\n", file.channels ()) ;
-	printf ("    Frames    : %d\n", file.frames()) ;
+	if(options.windowFunction == "rect")
+		windowf = make_unique<RectangleWindowFunction>();
+	else if(options.windowFunction == "hann")
+		windowf = make_unique<RectangleWindowFunction>();
+	else if(options.windowFunction == "hamming")
+		windowf = make_unique<RectangleWindowFunction>();
+	else if(options.windowFunction == "blackmann")
+		windowf = make_unique<RectangleWindowFunction>();
+	else {
+		cout << "neplatná window funkce"<<endl;
+		return 1;
+	}
+	int windowSize = options.windowSize;
+	if((windowSize & (windowSize - 1)) != 0){
+		cout << "neplatná velikost rámce"<<endl;
+		return 1;
+	}
 
-	// sw.readWindow();
+	windowf->setWindowSize(windowSize);
+
 	vector<double> buffer;
-	buffer.resize(BUFFER_LEN);
+	buffer.resize(windowSize);
 	
-	int slide = 128;
-	sw.setWindow(BUFFER_LEN, slide);
+	int slide = options.windowSlide;
+	if(slide <= 0){
+		cout << "neplatná délka posunutí rámce" << endl;
+		return 1;
+	}
+	sw.setWindow(windowSize, slide);
 
-	// int height = BUFFER_LEN;
-	// int width = ceil(file.frames()/slide);
-		
-	Complex fourierBuffer2[BUFFER_LEN];
+	Complex fourierBuffer2[windowSize];
 
 	unique_ptr<FFTRenderer> fftrender = make_unique<FFTRenderer>();
 	unique_ptr<WaveRenderer> waverender = make_unique<WaveRenderer>();
 	unique_ptr<AveragesRenderer> averagesrender = make_unique<AveragesRenderer>();
 
-	// int x = 0;
-	while(sw.read(buffer, BUFFER_LEN)){
-		for (int i = 0; i < BUFFER_LEN; i++){
-			fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
+	while(sw.read(buffer, windowSize)){
+		for (int i = 0; i < windowSize; i++){
+			fourierBuffer2[i] = windowf->apply(buffer[i], i);
+			// fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
 			// fourierBuffer2[i] = buffer[i];
 		}
 
 		waverender->addFrame(buffer, slide);
 		
-    	CArray data(fourierBuffer2, BUFFER_LEN);
+    	CArray data(fourierBuffer2, windowSize);
 	    fft(data);
 
-	    vector<double> values(BUFFER_LEN/2);
-		for (int i = 0; i < BUFFER_LEN/2; i++){
-			Complex c = data[BUFFER_LEN/2+i];
+	    vector<double> values(windowSize/2);
+		for (int i = 0; i < windowSize/2; i++){
+			Complex c = data[windowSize/2+i];
 			values[i] = abs(c);
 		}
 
@@ -458,50 +612,5 @@ read_file (const char * fname)
 
 	imageOut.renderImage("out.png");
 
-	// int readBytes = file.read (buffer, BUFFER_LEN);
-	// int x = 0;
-	// file.read(buffer, BUFFER_LEN);
-	// for (int i = 0; i < BUFFER_LEN; i+=1){
-	// 	cout << fourierBuffer[i] << endl;
-	// 	int val = fourierBuffer[i]*halfheight;
-	// 	int y = min(height-2, max(0, val+halfheight));
-	// 	img.set_pixel(x,y, rgb_pixel(255, 255, 255));
-		
-	// 	int val2 = buffer[min(BUFFER_LEN, i*2)]/32768.0*halfheight;
-	// 	int y2 = val2+halfheight;
-	// 	img.set_pixel(x,y2, rgb_pixel(255, 0, 0));
-
-	// 	x++;
-	// 	// cout << x << " " << y << endl;
-	// }
-	// img.write("output.png");
-
-
-
-	// while(file.read (buffer, BUFFER_LEN) > 0){
-	// 	for (int i = 0; i < BUFFER_LEN; i+=channels)
-	// 	{
-	// 	cout << buffer[0]/scale << endl;
-
-	// 	}
-	// 	int val = buffer[0]/scale;
-	// 	int start = halfheight 
-	// 	for (size_t y = 0; y < val; ++y){
-	// 		img[y][x] = rgb_pixel(255, 255, 255);
-	// 	}
-	// 	x++;
-	// }
+	return 0;
 }
-
-
-int main (void)
-{	const char * fname = "input/test.wav" ;
-
-	puts ("\nSimple example showing usage of the C++ SndfileHandle object.\n") ;
-
-	read_file (fname) ;
-
-	puts ("Done.\n") ;
-	return 0 ;
-} /* main */
-
