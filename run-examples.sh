@@ -1,5 +1,7 @@
 #!/bin/sh
 
+mkdir -p output
+
 # demonstrace nastavení slide parametru
 ./spectrogram -s 300 -o output/amen_break.png input/amen_break.wav
 ./spectrogram -s 400 -o output/aphex.png input/aphex.wav
