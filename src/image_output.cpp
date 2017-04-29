@@ -108,31 +108,35 @@ class FFTRenderer : public ImageBlock {
 	vector<vector<double>> spectrum;
 
 	// http://stackoverflow.com/questions/15868234/map-a-value-0-0-1-0-to-color-gain
-	double linear(double x, double start, double width = 0.2) {
+	// paleta z: http://4.bp.blogspot.com/-d96rd-cACn0/TdUINqcBxuI/AAAAAAAAA9I/nGDXL7ksxAc/s1600/01-Deep_Rumba-A_Calm_in_the_Fire_of_Dances_2496-Cubana.flac.png
+	double linear(double x, double start, double end) {
 		if (x < start)
 			return 0;
-		else if (x > start+width)
+		else if (x > end)
 			return 1;
 		else
-			return (x-start) / width;
+			return (x-start) / (end-start);
 	}
 
 	double getR(double value){
-		return linear(value, 0.2);
+		return linear(value, 25.0/200.0, 140.0/200.0);
 	}
 	double getG(double value){
-		return linear(value, 0.6);
+		return linear(value, 120.0/200.0, 180.0/200.0);
 	}
 	double getB(double value){
-		return linear(value, 0) - linear(value, 0.4) + linear(value, 0.8);
+		return linear(value, 0.75, 1.0) + (linear(value, 0, 57.0/200.0) - linear(value, 63.0/200.0, 120.0/200.0))*0.5;
+		return 1.0-linear(value, 0, 0.5);
 	}
 
 	vector<rgb_pixel> palette;
 public:
 	FFTRenderer(){
-		for (int i = 0; i < 256; ++i)
+		int paletteSize = 512;
+		double ps = paletteSize;
+		for (int i = 0; i < paletteSize; ++i)
 		{
-			rgb_pixel p(i, i, i);
+			rgb_pixel p(getR(i/ps)*255, getG(i/ps)*255, getB(i/ps)*255);
 			palette.push_back(p);
 		}
 	}
@@ -178,6 +182,7 @@ public:
 		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
 
 		renderScale(img, tx + getWidth() + 10, ty + getHeight() + 10, 100, 20);
+		ImageUtils::rectangle(img, tx + getWidth() + 10, ty + getHeight() + 10, 100, 20);
 	}
 
 	void renderScale(image<rgb_pixel>& img, int tx, int ty, int widthscale, int heightscale){
