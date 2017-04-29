@@ -19,11 +19,14 @@ public:
 		}
 	}
 
-	static void hline(image<rgb_pixel>& img, int x, int y, int size){
-		rgb_pixel white(255, 255, 255);
+	static void hline(image<rgb_pixel>& img, int x, int y, int size, bool red = false){
+		rgb_pixel p(255, 255, 255);
+		if(red)
+			p = rgb_pixel(255, 20, 0);
+
 		for (int i = x; i < x+size; ++i)
 		{
-			img[y][i] = white;
+			img[y][i] = p;
 		}
 	}
 
@@ -92,7 +95,10 @@ public:
 		for (size_t i = 0; i < spectrumSums.size(); ++i)
 		{
 			int value = spectrumSums[i]/maxValue*width;
-			ImageUtils::hline(img, tx, ty+height-i, value);
+			if(spectrumSums[i] == maxValue)
+				ImageUtils::hline(img, tx, ty+height-i, value, true);
+			else
+				ImageUtils::hline(img, tx, ty+height-i, value, false);
 		}
 	}
 
@@ -213,6 +219,7 @@ class WaveRenderer : public ImageBlock {
 public:
 	void addFrame(vector<double>& column, int slide){
 		// double maxValue = accumulate(column.begin(), column.end(), 0)/((double)column.size());
+		slide = min(slide, (int)column.size());
 		double maxValue = *max_element(column.begin(), column.begin()+slide);
 		wave.push_back(maxValue);
 	}

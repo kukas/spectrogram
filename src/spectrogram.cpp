@@ -203,13 +203,6 @@ public:
 		if (argv[0]) {
 			input = string(argv[0]);
 		}
-
-		cout << input << endl;
-		cout << output << endl;
-		cout << channel << endl;
-		cout << windowSize << endl;
-		cout << windowSlide << endl;
-		cout << windowFunction << endl;
 	}
 private:
 	void error() const {
@@ -254,6 +247,9 @@ int main(int argc, char** argv)
 	cout << "  Sample rate: " << file.samplerate() << endl;
 	cout << "  Channels: " << file.channels() << endl;
 	cout << "  Frames: " << file.frames() << endl;
+
+	cout << "Výstupní soubor: " << options.output << endl;
+	cout << "  Rozměr spektrogramu: " << file.frames()/options.windowSlide << "x" << options.windowSize/2 << endl;
 
 	// nastavení čtení zvoleného kanálu
 	ChannelReader cr(file);
