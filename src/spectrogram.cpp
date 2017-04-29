@@ -1,9 +1,3 @@
-// dependencies:
-// png++
-// libsndfile
-// compilation:
-// g++ -lsndfile -o sndfile sndfile.cpp
-
 #include <fstream>
 #include <string>
 #include <iostream>
@@ -17,121 +11,13 @@
 using namespace std;
 using namespace png;
 
+#include "input.cpp"
 #include "image_output.cpp"
 #include "fft.cpp"
 #include "window_functions.cpp"
 
-class ChannelReader
-{
-	int channels;
-	int channel;
-	SndfileHandle& handle;
-	vector<double> buffer;
-public:
-	ChannelReader(SndfileHandle& handle_) : handle(handle_) {
-		channels = handle.channels();
-		setChannel(0);
-	}
-
-	int read(vector<double>& outBuffer, int size){
-		int bufferSize = size*channels;
-		buffer.resize(bufferSize);
-		int readBytes = handle.read(buffer.data(), bufferSize);
-		int readFrames = readBytes/channels; // readFrames <= size
-		for (int i = 0; i < readFrames; ++i)
-		{
-			outBuffer[i] = buffer[i*channels + channel];
-		}
-		return readFrames;
-	}
-
-	void setChannel(int channel_){
-		if(channel_ >= 0 && channel_ < channels)
-			channel = channel_;
-		else
-			throw invalid_argument("invalid channel");
-	}
-};
-
-class SlidingWindow
-{
-	int position = 0;
-	int bufferSize;
-
-	int windowSize;
-	int windowSlide;
-
-	vector<double> buffer;
-	vector<double> window;
-	ChannelReader& reader;
-
-	bool readTo(vector<double>& buf, int size){
-		int readBytes = reader.read(buf, size);
-		position += readBytes;
-		return readBytes == size;
-	}
-
-	bool readWindow(){
-		return readTo(window, windowSize);
-	}
-
-	bool readBuffer(){
-		return readTo(buffer, bufferSize);
-	}
-	bool next(){
-		if(position == 0){
-			return readWindow();
-		}
-
-		if(windowSlide < windowSize){
-			// slide existing data
-			copy(window.begin()+windowSlide, window.end(), window.begin());
-			// read and copy new data to the end
-			bool notEnd = readBuffer();
-			copy(buffer.begin(), buffer.end(), window.end()-windowSlide);
-			return notEnd;
-		}
-		else {
-			// posun
-			readBuffer();
-			// čtení
-			return readWindow();
-		}
-	}
-
-public:
-	SlidingWindow(ChannelReader reader) : reader(reader) {
-		setWindow(128, 64);
-	}
-
-	void setWindow(int size, int slide){
-		windowSize = size;
-		windowSlide = slide;
-
-		if(slide <= size){
-			bufferSize = slide;
-		}
-		else {
-			bufferSize = slide - size;
-		}
-
-		buffer.resize(bufferSize);
-		window.resize(windowSize);
-	}
-
-	bool read(vector<double>& outBuffer, int size){
-		if (next()) {
-			copy_n(window.begin(), size, outBuffer.begin());
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-};
-
 void printhelp(char* scriptName){
-	cout << "Použití: " << string(scriptName) << "[PŘEPÍNAČE] VSTUPNÍ_SOUBOR" << endl;
+	cout << "Použití: " << string(scriptName) << " [PŘEPÍNAČE] VSTUPNÍ_SOUBOR" << endl;
 	cout << "Generuje spektrogram ve formátu png ze VSTUPNÍHO SOUBORU." << endl;
 	cout << endl;
 	cout << "  -c KANÁL\t\t\tze VSTUPNÍHO SOUBORU čte KANÁL. Výchozí hodnota je 0 (1. kanál). Týká se pouze stereo nahrávek." << endl;
@@ -303,39 +189,45 @@ int main(int argc, char** argv)
 	FFT fft;
 	fft.setTransformSize(windowSize);
 
+	// buffer pro čtení zvukového souboru
 	vector<double> buffer;
+	// buffer pro výsledky fourierovy transformace
 	vector<double> fourierBuffer;
 	buffer.resize(windowSize);
-
+	// fourierBuffer má dvojnásobnou velikost kvůli imaginárním částem
 	fourierBuffer.resize(windowSize*2);
 
 	while(sw.read(buffer, windowSize)){
+		// smazání imaginárních částí z minulého výpočtu
 		fill(fourierBuffer.begin()+windowSize, fourierBuffer.end(), 0);
-
+		// přepis z bufferu do fourierBufferu + aplikace window funkce
 		for (int i = 0; i < windowSize; i++){
 			fourierBuffer[i] = windowf->apply(buffer[i], i);
 		}
 
 		vector<double> mag = fft.getMagnitudes(fourierBuffer);
 
+		// předání hodnot do tříd zajišťujících grafický výstup
 		waverender->addFrame(buffer, slide);
 		averagesrender->addFrame(mag);
 		fftrender->addFrame(mag);
 	}
 
-	// obrázkový výstup
+	// grafický výstup
 	ImageOutput imageOut;
 
 	// umístění komponent
-	waverender->y = fftrender->getHeight()+10;
-	averagesrender->x = fftrender->getWidth()+10;
+	waverender->y = fftrender->getHeight()+10; // pod FFT
+	averagesrender->x = fftrender->getWidth()+10; // napravo od FFT
 
+	// měřítko os
 	double timescale = file.frames()/((double)file.samplerate());
 	double freqscale = file.samplerate()/2.0;
 	unique_ptr<ScaleRenderer> fftscale = make_unique<ScaleRenderer>(0, 0, fftrender->getWidth(), fftrender->getHeight(), timescale, freqscale, 0.5, 1000);
 	unique_ptr<ScaleRenderer> wavescale = make_unique<ScaleRenderer>(0, waverender->y, waverender->getWidth(), waverender->getHeight(), timescale, -1, 0.5, -1);
 	unique_ptr<ScaleRenderer> averagesscale = make_unique<ScaleRenderer>(averagesrender->x, 0, averagesrender->getWidth(), averagesrender->getHeight(), -1, freqscale, -1, 1000);
 
+	// zobrazení window funkce
 	imageOut.addBlock(make_unique<WindowRenderer>(averagesrender->x+15, waverender->y+30, 70, 70, move(windowf), windowSize));
 
 	imageOut.addBlock(move(fftrender));
@@ -345,8 +237,6 @@ int main(int argc, char** argv)
 	imageOut.addBlock(move(fftscale));
 	imageOut.addBlock(move(wavescale));
 	imageOut.addBlock(move(averagesscale));
-
-	
 
 	// výstup
 	imageOut.renderImage(options.output);
