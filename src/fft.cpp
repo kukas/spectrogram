@@ -7,7 +7,23 @@ using namespace std;
 
 class FFT
 {
+    vector<double> cacher;
+    vector<double> cachei;
+    int transformSize;
 public:
+    void setTransformSize(int N){
+        transformSize = N;
+        cacher.resize(N/2);
+        cachei.resize(N/2);
+        for (int i = 0; i < N/2; ++i)
+        {
+            // jednotková kružnice
+            double cr = cos(-2*M_PI*i/N);
+            double ci = sin(-2*M_PI*i/N);
+            cacher[i] = cr;
+            cachei[i] = ci;
+        }
+    }
     // https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
 	void transform(vector<double>& data){
         // for (size_t i = 0; i < data.size(); i++)
@@ -33,9 +49,8 @@ public:
 
         for (int i = 0; i < N/2; ++i)
         {
-            // jednotková kružnice
-            double cr = cos(2*M_PI*i/N);
-            double ci = sin(2*M_PI*i/N);
+            double cr = cacher[i*transformSize/N];
+            double ci = cachei[i*transformSize/N];
             // sudé
             double oddr = odd[i];
             double oddi = odd[i+imag/2];

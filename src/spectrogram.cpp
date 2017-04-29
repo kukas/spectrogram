@@ -308,6 +308,7 @@ int main(int argc, char** argv)
 	unique_ptr<AveragesRenderer> averagesrender = make_unique<AveragesRenderer>();
 
 	FFT fft;
+	fft.setTransformSize(windowSize);
 
 	vector<double> buffer;
 	vector<double> fourierBuffer;

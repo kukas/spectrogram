@@ -80,17 +80,18 @@ public:
 		ty += y;
 		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
 
-		// double maxValue = *max_element(spectrumSums.begin(), spectrumSums.end());
+		double maxValue = *max_element(spectrumSums.begin(), spectrumSums.end());
 
-		// // empty spectrum
-		// if(maxValue == 0)
-		// 	return;
+		// empty spectrum
+		if(maxValue == 0)
+			return;
 
-		// for (size_t i = 0; i < spectrumSums.size(); ++i)
-		// {
-		// 	int value = spectrumSums[i]/maxValue*width;
-		// 	ImageUtils::vline(img, tx, ty+i, value);
-		// }
+		int height = getHeight();
+		for (size_t i = 0; i < spectrumSums.size(); ++i)
+		{
+			int value = spectrumSums[i]/maxValue*width;
+			ImageUtils::vline(img, tx, ty+height-i, value);
+		}
 	}
 
 	virtual int getWidth(){
