@@ -65,7 +65,7 @@ Výsledek FFT a vlnová funkce se předají do tříd zajišťujících grafick�
 Barevné znázornění intenzity spektra je inspirováno paletou programu [SoX](http://sox.sourceforge.net/). Paleta byla aproximována z výstupu _SoXu_ pomocí lineárních kombinací RGB složek.
 
 # Credits
-* Zvuková nahrávka cella stažena z (freesound.org)[https://www.freesound.org/people/flcellogrl/packs/12408/]
-* Nahrávka amen breaku stažena z (freesound.org)[https://www.freesound.org/people/VEXST/sounds/24940/]
+* Zvuková nahrávka cella stažena z [freesound.org](https://www.freesound.org/people/flcellogrl/packs/12408/)
+* Nahrávka amen breaku stažena z [freesound.org](https://www.freesound.org/people/VEXST/sounds/24940/)
 * Nahrávka aphex.wav vyříznuta ze skladby ```Aphex Twin - ΔMi−1 = −αΣn=1NDi[n][Σj∈C[i]Fji[n − 1] + Fexti[n−1]]```
-* Ostatní nahrávky generovány programem (Audacity)[http://www.audacityteam.org/]
+* Ostatní nahrávky generovány programem [Audacity](http://www.audacityteam.org/)
