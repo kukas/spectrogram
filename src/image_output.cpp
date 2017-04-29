@@ -3,13 +3,15 @@
 #include <memory>
 #include <algorithm>
 
+#include "window_functions.cpp"
+
 using namespace std;
 using namespace png;
 
 class ImageUtils
 {
 public:
-	static void hline(image<rgb_pixel>& img, int x, int y, int size){
+	static void vline(image<rgb_pixel>& img, int x, int y, int size){
 		rgb_pixel white(255, 255, 255);
 		for (int i = y; i < y+size; ++i)
 		{
@@ -17,7 +19,7 @@ public:
 		}
 	}
 
-	static void vline(image<rgb_pixel>& img, int x, int y, int size){
+	static void hline(image<rgb_pixel>& img, int x, int y, int size){
 		rgb_pixel white(255, 255, 255);
 		for (int i = x; i < x+size; ++i)
 		{
@@ -30,12 +32,12 @@ public:
 		for (int x_ = x; x_ < x+width; ++x_)
 		{
 			img[y][x_] = white;
-			img[y+height-1][x_] = white;
+			img[y+height][x_] = white;
 		}
 		for (int y_ = y; y_ < y+height; ++y_)
 		{
 			img[y_][x] = white;
-			img[y_][x+width-1] = white;
+			img[y_][x+width] = white;
 		}
 	}
 };
@@ -90,7 +92,7 @@ public:
 		for (size_t i = 0; i < spectrumSums.size(); ++i)
 		{
 			int value = spectrumSums[i]/maxValue*width;
-			ImageUtils::vline(img, tx, ty+height-i, value);
+			ImageUtils::hline(img, tx, ty+height-i, value);
 		}
 	}
 
@@ -166,7 +168,7 @@ public:
 				// int yy = round(bufferSize*log(y)/log(bufferSize));
 				double value = max(0.0, spectrum[x_][y_]/maxValue);
 				value = 1-min(-log(value), 12.0)/12.0;
-				value *= 255;
+				value *= palette.size();
 				img[ty+height-y_][tx+x_] = palette[(size_t)value];
 				// img[ty+y_][tx+x_] = rgb_pixel(value, value, value);
 				// img.set_pixel(tx+x_, ty+y_, rgb_pixel(value, value, value));
@@ -174,6 +176,20 @@ public:
 		}
 
 		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
+
+		renderScale(img, tx + getWidth() + 10, ty + getHeight() + 10, 100, 20);
+	}
+
+	void renderScale(image<rgb_pixel>& img, int tx, int ty, int widthscale, int heightscale){
+		for (int x_ = 0; x_ < widthscale; ++x_)
+		{
+			for (int y_ = 0; y_ < heightscale; ++y_)
+			{
+				double value = x_/(double)widthscale;
+				value *= palette.size();
+				img[ty+y_][tx+x_] = palette[(size_t)value];
+			}
+		}
 	}
 
 	virtual int getWidth(){
@@ -206,7 +222,7 @@ public:
 		for (size_t i = 0; i < wave.size(); ++i)
 		{
 			int size = halfheight*wave[i];
-			ImageUtils::hline(img, tx+x+i, ty+halfheight-size, size*2);
+			ImageUtils::vline(img, tx+x+i, ty+halfheight-size, size*2);
 		}
 	}
 
@@ -216,6 +232,74 @@ public:
 	virtual int getHeight(){
 		return height;
 	};
+};
+
+class ScaleRenderer : public ImageBlock {
+public:
+	double rangex, rangey, dx, dy;
+	ScaleRenderer(int x, int y, int width, int height, double rangex, double rangey, double dx, double dy) : 
+		rangex(rangex), rangey(rangey), dx(dx), dy(dy) {
+			this->x = x;
+			this->y = y;
+			this->width = width;
+			this->height = height;
+		}
+
+	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		tx += x;
+		ty += y;
+		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
+
+		if(rangex > 0){
+			for (double x_ = 0; x_ <= rangex; x_ += dx)
+			{
+				ImageUtils::vline(img, tx+width*x_/rangex, ty-2 + height, 5);
+				ImageUtils::vline(img, tx+width*x_/rangex, ty-2, 5);
+			}
+		}
+
+		if(rangey > 0){
+			for (double y_ = 0; y_ <= rangey; y_ += dy)
+			{
+				ImageUtils::hline(img, tx-2 + width, ty + height-height*y_/rangey, 5);
+				ImageUtils::hline(img, tx-2, ty + height-height*y_/rangey, 5);
+			}
+		}
+	}
+};
+
+class WindowRenderer : public ImageBlock {
+	unique_ptr<WindowFunction> windowf;
+	int windowSize;
+public:
+	double rangex, rangey, dx, dy;
+	WindowRenderer(int x, int y, int width, int height, unique_ptr<WindowFunction> windowf, int windowSize) : 
+		windowf(move(windowf)), windowSize(windowSize) {
+			this->x = x;
+			this->y = y;
+			this->width = width;
+			this->height = height;
+		}
+
+	virtual void render(image<rgb_pixel>& img, int tx, int ty){
+		tx += x;
+		ty += y;
+		ImageUtils::rectangle(img, tx, ty, getWidth(), getHeight());
+
+		for (double x_ = 0; x_ <= width; ++x_)
+		{
+			double h = windowf->apply(height, x_*windowSize/width);
+			ImageUtils::vline(img, tx+x_, ty+height-h+1, h);
+		}
+
+		// if(rangey > 0){
+		// 	for (double y_ = 0; y_ <= rangey; y_ += dy)
+		// 	{
+		// 		ImageUtils::hline(img, tx-2 + width, ty + height-height*y_/rangey, 5);
+		// 		ImageUtils::hline(img, tx-2, ty + height-height*y_/rangey, 5);
+		// 	}
+		// }
+	}
 };
 
 class ImageOutput

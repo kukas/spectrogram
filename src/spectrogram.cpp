@@ -17,9 +17,6 @@
 using namespace std;
 using namespace png;
 
-#include <complex>
-#include <valarray>
-
 #include "image_output.cpp"
 #include "fft.cpp"
 #include "window_functions.cpp"
@@ -273,11 +270,11 @@ int main(int argc, char** argv)
 	if(options.windowFunction == "rect")
 		windowf = make_unique<RectangleWindowFunction>();
 	else if(options.windowFunction == "hann")
-		windowf = make_unique<RectangleWindowFunction>();
+		windowf = make_unique<HannWindowFunction>();
 	else if(options.windowFunction == "hamming")
-		windowf = make_unique<RectangleWindowFunction>();
+		windowf = make_unique<HammingWindowFunction>();
 	else if(options.windowFunction == "blackmann")
-		windowf = make_unique<RectangleWindowFunction>();
+		windowf = make_unique<BlackmannWindowFunction>();
 	else {
 		cout << "neplatná window funkce"<<endl;
 		return 1;
@@ -321,7 +318,6 @@ int main(int argc, char** argv)
 
 		for (int i = 0; i < windowSize; i++){
 			fourierBuffer[i] = windowf->apply(buffer[i], i);
-			// fourierBuffer2[i] = buffer[i]*0.5*(1-cos(2*PI*i/(BUFFER_LEN-1)));
 		}
 
 		vector<double> mag = fft.getMagnitudes(fourierBuffer);
@@ -338,12 +334,26 @@ int main(int argc, char** argv)
 	waverender->y = fftrender->getHeight()+10;
 	averagesrender->x = fftrender->getWidth()+10;
 
+	double timescale = file.frames()/((double)file.samplerate());
+	double freqscale = file.samplerate()/2.0;
+	unique_ptr<ScaleRenderer> fftscale = make_unique<ScaleRenderer>(0, 0, fftrender->getWidth(), fftrender->getHeight(), timescale, freqscale, 0.5, 1000);
+	unique_ptr<ScaleRenderer> wavescale = make_unique<ScaleRenderer>(0, waverender->y, waverender->getWidth(), waverender->getHeight(), timescale, -1, 0.5, -1);
+	unique_ptr<ScaleRenderer> averagesscale = make_unique<ScaleRenderer>(averagesrender->x, 0, averagesrender->getWidth(), averagesrender->getHeight(), -1, freqscale, -1, 1000);
+
+	imageOut.addBlock(make_unique<WindowRenderer>(averagesrender->x+15, waverender->y+30, 70, 70, move(windowf), windowSize));
+
 	imageOut.addBlock(move(fftrender));
 	imageOut.addBlock(move(waverender));
 	imageOut.addBlock(move(averagesrender));
 
+	imageOut.addBlock(move(fftscale));
+	imageOut.addBlock(move(wavescale));
+	imageOut.addBlock(move(averagesscale));
+
+	
+
 	// výstup
-	imageOut.renderImage("out.png");
+	imageOut.renderImage(options.output);
 
 	return 0;
 }
