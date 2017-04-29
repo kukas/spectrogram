@@ -44,10 +44,10 @@ Spektrogram bude vygenerován z pravého kanálu, za použití velikosti rámce 
 
 ## Čtení výstupu
 ![spectrogram](docs/popis.png)
-[1] Spektrogram [x = čas (po 500ms), y = frekvence (po 1000Hz), barva = intenzita]
-[2] Průběh zvukové vlny [x = čas (po 500ms)]
-[3] Průměrné hodnoty spektrogramu a zvýraznění fundamentální frekvence [x = intenzita, y = frekvence (po 1000Hz)]
-[4] Znázornění barevného měřítka spektrogramu [x = intenzita frekvence od nejnižší hodnoty v nahrávce po nejvyšší] a použité window funkce
+1. Spektrogram [x = čas (po 500ms), y = frekvence (po 1000Hz), barva = intenzita]
+2. Průběh zvukové vlny [x = čas (po 500ms)]
+3. Průměrné hodnoty spektrogramu a zvýraznění fundamentální frekvence [x = intenzita, y = frekvence (po 1000Hz)]
+4. Znázornění barevného měřítka spektrogramu [x = intenzita frekvence od nejnižší hodnoty v nahrávce po nejvyšší] a použité window funkce
 
 # Implementace
 ## Popis funkce programu
@@ -55,6 +55,9 @@ Program implementuje algoritmus zpracování signálu pomocí [short-time Fourie
 
 ### Podrobný popis
 Pro čtení vstupního souboru byla využita knihovna `libsndfile`, která zajišťuje kompatibilitu s nekomerčními zvukovými formáty. Vstup se čte sekvenčně, do paměti se vždy načte pouze potřebný počet samplů. Třída `ChannelReader` z výstupu knihovny `libsndfile` přečte jeden zvolený kanál. Třída `SlidingWindow` zajišťuje posouvání čtecího okénka, je také speciálně implementován případ pro posun větší než je velikost okénka, ten se hodí zejména u dlouhých vstupů.
+
 Na přečtená data se aplikuje _window funkce_ (zajíšťují potomci třídy `WindowFunction`). Pro zrychlení chodu programu je window funkce předpočítána.
+
 Na upravená data se spustí algoritmus FFT (třída `FFT`), zde je také implementována optimalizace předpočítáním opakujících se hodnot. Pro implementaci použitého algoritmu jsem čerpal z [článku na wikipedii](https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm) a z veřejně dostupného kódu na [rosettacode.org](https://rosettacode.org/wiki/Fast_Fourier_transform#C.2B.2B).
+
 Výsledek FFT a vlnová funkce se předají do tříd zajišťujících grafický výstup (třídy v souboru `image_output.cpp`). Protože použitá knihovna `libpng` obstarává pouze převod 2d pole pixelů do png souboru, struktura vykreslování byla implementována od základů. Z toho důvodu také na obrázku není žádný text - usoudil jsem, že implementace renderování písma je nad rámec zápočtového programu. Třída `ImageOutput` při zavolání metody `renderImage` vypočítá konečné rozměry obrázku a vykreslí všechny `ImageBlock`. Potomci abstraktní třídy `ImageBlock` jsou jednotlivé komponenty, ze kterého je složený výsledný obrázek - tedy třída `FFTRenderer` (vykreslení spektrogramu [1]), `WaveRenderer` (vykreslení vlnového průběhu [2]), `AveragesRenderer` (vykreslení průměrných hodnot spektrogramu [3]), `WindowRenderer` (znázornění window funkce [4]), `ScaleRenderer` (vykreslení měřítka jednotlivých bloků).
