@@ -53,6 +53,7 @@ protected:
 public:
 	int x = 0;
 	int y = 0;
+	virtual ~ImageBlock() {};
 	virtual void render(image<rgb_pixel>& img, int tx, int ty) = 0;
 	virtual int getWidth(){
 		return width;

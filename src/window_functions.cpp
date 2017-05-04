@@ -12,6 +12,7 @@ class WindowFunction
 protected:
 	int windowSize = 0;
 public:
+	virtual ~WindowFunction() {};
 	virtual double apply(double value, int i) = 0;
 	virtual void setWindowSize(int windowsize){
 		windowSize = windowsize;
