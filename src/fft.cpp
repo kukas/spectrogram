@@ -1,6 +1,4 @@
 #include <iostream>
-#include <complex>
-#include <valarray>
 #include <cmath>
 #include <vector>
 using namespace std;
