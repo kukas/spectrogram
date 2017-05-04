@@ -1,11 +1,11 @@
 TARGET = spectrogram
-CPPFLAGS=-Wall
+CPPFLAGS=-Wall -std=c++14
 LDLIBS=-lsndfile -lpng
 INCLUDES=$(wildcard src/*.hpp)
 SRC=src/spectrogram.cpp
 
 $(TARGET): $(SRC) $(INCLUDES)
-	g++ -o spectrogram $(SRC) $(LDLIBS)
+	g++ $(CPPFLAGS) -o spectrogram $(SRC) $(LDLIBS)
 
 .PHONY: clean
 
