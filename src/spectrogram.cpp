@@ -8,13 +8,13 @@
 #include <algorithm>
 #include <numeric>
 
+#include "input.hpp"
+#include "image_output.hpp"
+#include "fft.hpp"
+#include "window_functions.hpp"
+
 using namespace std;
 using namespace png;
-
-#include "input.cpp"
-#include "image_output.cpp"
-#include "fft.cpp"
-#include "window_functions.cpp"
 
 void printhelp(char* scriptName){
 	cout << "Použití: " << string(scriptName) << " [PŘEPÍNAČE] VSTUPNÍ_SOUBOR" << endl;
@@ -109,7 +109,7 @@ int main(int argc, char** argv)
 		options.process(argv);
 	}
 	catch (const invalid_argument & e) {
-		cout << e <<endl;
+		cout << e.what() <<endl;
 		return 1;
 	}
 
