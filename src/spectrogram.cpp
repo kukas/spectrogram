@@ -118,6 +118,13 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	// nastavení délky posouvání rámce
+	int slide = options.windowSlide;
+	if(slide <= 0){
+		cout << "neplatná délka posunutí rámce" << endl;
+		return 1;
+	}
+
 	cout << "Vstupní soubor: " << options.input << endl;
 
 	// načtení souboru
@@ -169,13 +176,6 @@ int main(int argc, char** argv)
 		return 1;
 	}
 	windowf->setWindowSize(windowSize);
-	
-	// nastavení délky posouvání rámce
-	int slide = options.windowSlide;
-	if(slide <= 0){
-		cout << "neplatná délka posunutí rámce" << endl;
-		return 1;
-	}
 
 	// čtení souboru posuvným oknem
 	SlidingWindow sw(cr);
