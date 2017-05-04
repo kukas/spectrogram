@@ -92,7 +92,7 @@ public:
 	}
 private:
 	void error() const {
-		throw invalid_argument("invalid parameters");
+		throw invalid_argument("chyba v přepínačích");
 	}
 };
 
@@ -108,8 +108,8 @@ int main(int argc, char** argv)
 	try {
 		options.process(argv);
 	}
-	catch (invalid_argument e) {
-		cout << "chyba v přepínačích"<<endl;
+	catch (const invalid_argument & e) {
+		cout << e <<endl;
 		return 1;
 	}
 
@@ -149,8 +149,8 @@ int main(int argc, char** argv)
 	try {
 		cr.setChannel(options.channel);
 	}
-	catch (invalid_argument e) {
-		cout << "neplatný kanál"<<endl;
+	catch (const invalid_argument &) {
+		cout << "neplatný kanál" << endl;
 		return 1;
 	}
 
